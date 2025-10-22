@@ -1,18 +1,18 @@
-import { PlaywrightCrawler, Dataset, RequestQueue } from 'crawlee';
+import { PlaywrightCrawler, RequestQueue, Dataset } from 'crawlee';
+import fs from 'fs';
 
 const startUrls = ['https://www.visitlondon.com/things-to-do'];
 
 const run = async () => {
-  // ✅ Explicitly create a request queue
   const requestQueue = await RequestQueue.open();
 
-  // Add the seed URL manually
+  // Add initial URLs with depth info
   for (const url of startUrls) {
     await requestQueue.addRequest({ url, userData: { depth: 0 } });
   }
 
   const crawler = new PlaywrightCrawler({
-    requestQueue, // ✅ attach the queue
+    requestQueue,
     requestHandlerTimeoutSecs: 60,
     navigationTimeoutSecs: 30,
     maxConcurrency: 3,
@@ -28,9 +28,13 @@ const run = async () => {
       const depth = request.userData.depth ?? 0;
       log.info(`🌐 Crawling: ${request.url} (depth: ${depth})`);
 
-      await page.waitForLoadState('networkidle');
+      try {
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+      } catch {
+        log.warning(`⚠️ Timeout while loading ${request.url}`);
+      }
 
-      // Clean up unnecessary UI
+      // Remove unnecessary UI elements
       await page.addStyleTag({
         content: `
           nav, footer, script, style, noscript, svg,
@@ -40,30 +44,33 @@ const run = async () => {
         `,
       });
 
-      // Extract info
+      // Extract clean data
       const data = await page.evaluate(() => {
-        const title = document.querySelector('h1,h2,h3')?.innerText || document.title || '';
-        const description = document.querySelector('meta[name="description"]')?.content || '';
-        const links = Array.from(document.querySelectorAll('a[href^="https://www.visitlondon.com/things-to-do"]'))
-          .map(a => a.href)
-          .filter((v, i, arr) => arr.indexOf(v) === i);
-        const text = document.body.innerText.slice(0, 2000);
-        return { title, description, links, text };
+        const title =
+          document.querySelector('h1,h2,h3')?.innerText ||
+          document.title ||
+          '';
+        const description =
+          document.querySelector('meta[name="description"]')?.content || '';
+        const text = Array.from(document.querySelectorAll('p'))
+          .map(p => p.innerText.trim())
+          .filter(Boolean)
+          .slice(0, 20)
+          .join('\n\n');
+        return { title, description, text };
       });
 
       await Dataset.pushData({
         url: request.url,
-        depth,
         ...data,
       });
 
-      // ✅ Recursively enqueue subpages
+      // Crawl deeper pages up to depth 3
       if (depth < 3) {
         await enqueueLinks({
           globs: ['https://www.visitlondon.com/things-to-do/**'],
-          strategy: 'same-domain',
           requestQueue,
-          transformRequestFunction: (req) => {
+          transformRequestFunction: req => {
             req.userData = { depth: depth + 1 };
             return req;
           },
@@ -73,7 +80,21 @@ const run = async () => {
   });
 
   await crawler.run();
-  console.log('✅ Crawl complete. Check ./storage/datasets/default for results.');
+
+  // Combine all dataset entries into a single JSON file
+  const dataset = await Dataset.open('default');
+  const { items } = await dataset.getData();
+
+  // Keep only the desired fields
+  const cleaned = items.map(({ url, title, description, text }) => ({
+    url,
+    title,
+    description,
+    text,
+  }));
+
+  fs.writeFileSync('./results.json', JSON.stringify(cleaned, null, 2));
+  console.log(`✅ Crawl complete. Saved ${cleaned.length} entries to results.json`);
 };
 
 await run();
