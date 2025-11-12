@@ -1,7 +1,8 @@
 import { PlaywrightCrawler, RequestQueue, Dataset } from 'crawlee';
 import fs from 'fs';
+import os from 'os';
 
-const startUrls = ['https://www.visitlondon.com/things-to-do'];
+const startUrls = ['https://www.madison.co.uk/'];
 
 const run = async () => {
   const requestQueue = await RequestQueue.open();
@@ -11,16 +12,35 @@ const run = async () => {
     await requestQueue.addRequest({ url, userData: { depth: 0 } });
   }
 
+  // Automatically set concurrency based on CPU cores
+  const cpuCores = os.cpus().length;
+  const isAppleSilicon = os.cpus()[0].model.includes('Apple');
+
+  // Apple Silicon optimization: Higher multiplier due to efficient P+E core architecture
+  const multiplier = isAppleSilicon ? 5 : 3;
+  const maxConcurrency = cpuCores * multiplier;
+  const minConcurrency = Math.max(1, Math.floor(cpuCores / 2));
+
+  console.log(`🚀 Starting crawler with ${cpuCores} CPU cores (${isAppleSilicon ? 'Apple Silicon' : 'Standard'})`);
+  console.log(`📊 Max concurrency: ${maxConcurrency}, Min concurrency: ${minConcurrency}`);
+
   const crawler = new PlaywrightCrawler({
     requestQueue,
     requestHandlerTimeoutSecs: 60,
     navigationTimeoutSecs: 30,
-    maxConcurrency: 3,
+    maxConcurrency,
+    minConcurrency,
 
     launchContext: {
       launchOptions: {
         headless: true,
         ignoreHTTPSErrors: true,
+        args: [
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-images',  // Skip loading images for speed
+        ],
       },
     },
 
@@ -66,9 +86,9 @@ const run = async () => {
       });
 
       // Crawl deeper pages up to depth 3
-      if (depth < 3) {
+      if (depth < 4) {
         await enqueueLinks({
-          globs: ['https://www.visitlondon.com/things-to-do/**'],
+          globs: ['https://www.madison.co.uk/**'],
           requestQueue,
           transformRequestFunction: req => {
             req.userData = { depth: depth + 1 };
