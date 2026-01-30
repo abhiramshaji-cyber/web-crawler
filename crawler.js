@@ -2,7 +2,7 @@ import { PlaywrightCrawler, RequestQueue, Dataset } from 'crawlee';
 import fs from 'fs';
 import os from 'os';
 
-const startUrls = ['https://www.drmichaels.com/'];
+const startUrls = ['https://yamaha-motor.com.mx/'];
 
 // Track discovered pages
 const discoveredPages = new Set();
@@ -68,8 +68,8 @@ const parseSitemap = async (baseUrl) => {
 const run = async () => {
   const requestQueue = await RequestQueue.open();
 
-  const targetDomain = 'https://www.drmichaels.com/';
-  const excludedPaths = ['/zh-hans/', '/blog', '/ru', '/ar'];
+  const targetDomain = 'https://yamaha-motor.com.mx/';
+  const excludedPaths = ['/ar'];
 
   // Helper function to check if URL is allowed (not in excluded paths)
   const isAllowedUrl = (url) => {
@@ -124,8 +124,8 @@ const run = async () => {
 
   console.log(`🚀 Starting crawler with ${cpuCores} CPU cores (${isAppleSilicon ? 'Apple Silicon' : 'Standard'})`);
   console.log(`📊 Max concurrency: ${maxConcurrency}, Min concurrency: ${minConcurrency}`);
-  console.log(`✅ Crawling: https://www.drmichaels.com/ (all pages)`);
-  console.log(`❌ Excluding: /zh-hans/, /blog, /ru, /ar`);
+  console.log(`✅ Crawling: https://yamaha-motor.com.mx/ (all pages)`);
+  console.log(`❌ Excluding: /ar`);
   console.log(`📋 Queued ${queuedPages.size} unique pages from sitemap\n`);
 
   const crawler = new PlaywrightCrawler({
@@ -296,7 +296,7 @@ const run = async () => {
       // Continue crawling - increased depth limit to ensure we find all pages
       if (depth < 10) {
         await enqueueLinks({
-          globs: ['https://www.drmichaels.com/**'],
+          globs: ['https://yamaha-motor.com.mx/**'],
           exclude: [],
           requestQueue,
           transformRequestFunction: req => {
@@ -411,8 +411,8 @@ const run = async () => {
   console.log(`📊 Total pages visited: ${visitedPages.size}`);
   console.log(`🔗 Total pages queued: ${queuedPages.size}`);
   console.log(`🔍 Total pages discovered: ${discoveredPages.size}`);
-  console.log(`✓ All URLs are from: https://www.drmichaels.com/`);
-  console.log(`✓ Excluded: /zh-hans/, /blog, /ru, /ar`);
+  console.log(`✓ All URLs are from: https://yamaha-motor.com.mx/`);
+  console.log(`✓ Excluded: /ar`);
   console.log(`\n📁 Output:`);
   console.log(`   • Created ${fileCount} text files in ./pages/`);
   console.log(`   • Each file contains: headings, paragraphs, lists, and image URLs`);
